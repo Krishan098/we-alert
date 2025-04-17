@@ -51,12 +51,15 @@ export const authService = {
       // Store tokens and user data
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token.access);
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.token.refresh);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
       
-      return data;
-    } catch (error) {
+      return {
+        success:true,
+        user:response.data.user,
+      };
+    } catch (error:any) {
       console.error('Error verifying OTP:', error);
-      throw error;
+      return {success :false};
     }
   },
 
@@ -88,11 +91,16 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
+    try{
+
+    
     await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
     await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
     await AsyncStorage.removeItem(USER_DATA_KEY);
-  },
-
+  }catch (error) {
+    console.error('Error during logout:', error);
+  }
+},
   async isLoggedIn(): Promise<boolean> {
     const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
     return !!token;
