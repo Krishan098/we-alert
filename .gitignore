@@ -59,3 +59,4 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
+\backend\we_alert\.env
