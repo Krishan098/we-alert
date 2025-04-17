@@ -27,8 +27,10 @@ class UnsafeArea(models.Model):
     name=models.CharField(max_length=255)
     latitude=models.FloatField()    
     longitude=models.FloatField()
-    radius=models.FloatField() 
+    radius=models.FloatField(default=0.0) 
     created_at=models.DateTimeField(auto_now_add=True)
+    description = models.TextField(blank=True, null=True)
+    
 
     def __str__(self):
         return f"{self.name} - {self.latitude}, {self.longitude}"

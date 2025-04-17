@@ -5,9 +5,11 @@ from rest_framework.views import APIView
 from .models import SOSAlert, PastSOSAlert, UnsafeArea, CrimeStats,EmergencyContact,UserSettings,SOSSession
 from .serializers import SOSAlertSerializer, PastSOSAlertSerializer, UnsafeAreaSerializer, CrimeStatsSerializer,SOSSessionSerializer,EmergencyContactSerializer,UserSettingsSerializer
 from django.utils import timezone
-from rest_framework.decorators import action
+from rest_framework.decorators import action,api_view,permission_classes
 from twilio.rest import Client
 from django.conf import settings
+from .utils.crime_analyzer import CrimeDataAnalyzer
+
 
 class SOSAlertViewSet(viewsets.ModelViewSet):
     queryset=SOSAlert.objects.all()
@@ -16,11 +18,75 @@ class SOSAlertViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+crime_analyzer = None
+
+def get_crime_analyzer():
+    global crime_analyzer
+    if crime_analyzer is None:
+        crime_analyzer = CrimeDataAnalyzer()
+    return crime_analyzer
 
 class UnsafeAreaViewSet(viewsets.ModelViewSet):
     queryset=UnsafeArea.objects.all()
     serializer_class=UnsafeAreaSerializer
     permission_classes=[permissions.IsAuthenticated]
+    @action(detail=False, methods=['get'])
+    def most_unsafe_areas(self,request):
+        min_count = int(request.query_params.get('min_count', 10))
+        analyzer = get_crime_analyzer()
+        unsafe_areas = analyzer.get_unsafe_areas(min_count)
+        
+        return Response({
+            'unsafe_areas': unsafe_areas,
+            'count': len(unsafe_areas)
+        })
+    
+    @action(detail=False, methods=['get'])
+    def west_delhi_unsafe(self, request):
+        """Get unsafe areas specifically in West Delhi"""
+        min_count = int(request.query_params.get('min_count', 5))
+        analyzer = get_crime_analyzer()
+        unsafe_areas = analyzer.get_west_delhi_unsafe_areas(min_count)
+        
+        return Response({
+            'unsafe_areas': unsafe_areas,
+            'count': len(unsafe_areas)
+        })
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def check_area_safety(request):
+    """Check if a specific area is considered safe or unsafe"""
+    location = request.query_params.get('location', '')
+    threshold = int(request.query_params.get('threshold', 5))
+    
+    if not location:
+        return Response({"error": "Location parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        analyzer = get_crime_analyzer()
+        result = analyzer.is_area_unsafe(location, threshold)
+        
+        # Add result to database for tracking if it's unsafe
+        if result['is_unsafe']:
+            UnsafeArea.objects.get_or_create(
+                name=location,
+                defaults={
+                    'latitude': 0.0,  # Default values
+                    'longitude': 0.0,
+                    'description': f"Area with {result['crime_count']} reported crimes"
+                }
+            )
+        
+        return Response({
+            'location': location,
+            'is_unsafe': result['is_unsafe'],
+            'crime_count': result['crime_count'],
+            'common_crimes': result['common_crimes']
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class CrimeViewSet(viewsets.ModelViewSet):
@@ -69,7 +135,8 @@ class SOSSessionViewSet(viewsets.ModelViewSet):
         return Response({"message": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
     
     def notify_emergency_contacts(self, session):
-        contacts=EmergencyContactSerializer.objects.filter(user=session.user)
+        
+        contacts=EmergencyContact.objects.filter(user=session.user)
         if contacts.exists():
             client=Client(settings.TWILIO_ACCOUNT_SID,settings.TWILIO_AUTH_TOKEN)
             message_body=(
