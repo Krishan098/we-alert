@@ -8,8 +8,38 @@ from django.utils import timezone
 from django.conf import settings
 from twilio.rest import Client
 from datetime import timedelta
+from rest_framework.decorators import api_view,permission_classes
 import random
 from rest_framework_simplejwt.tokens import RefreshToken
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def register_iser(request):
+    phone_number=request.data.get("phone_number")
+    name=request.data.get("name")
+    email=request.data.get("email")
+
+    if not phone_number:
+        return Response({"error":"Phone Number is required"},status=status.HTTP_400_BAD_REQUEST)
+    user_exists = CustomUser.objects.filter(phone_number=phone_number).exists()
+    
+    if user_exists:
+        # Update existing user with new information
+        user = CustomUser.objects.get(phone_number=phone_number)
+        if name:
+            user.name = name
+        if email:
+            user.email = email
+        user.save()
+    else:
+        # Create new user
+        user = CustomUser.objects.create(
+            phone_number=phone_number,
+            name=name,
+            email=email
+        )
+
+
 
 class SendOTPView(APIView):
     def post(self, request):

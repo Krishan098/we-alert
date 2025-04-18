@@ -11,6 +11,8 @@ type CustomInputProps = {
   editable?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   error?: string;
+  lefticon?: React.ReactNode;
+  righticon?: React.ReactNode;
 };
 
 const CustomInput: React.FC<CustomInputProps> = ({
@@ -23,11 +25,16 @@ const CustomInput: React.FC<CustomInputProps> = ({
   editable = true,
   autoCapitalize = 'none',
   error,
+  lefticon,
+  righticon,
 }) => {
   return (
     <View style={styles.container}>
+      {lefticon && <View style={styles.iconContainer}>{lefticon}</View>}
       <TextInput
-        style={[styles.input, error ? styles.inputError : null]}
+        style={[styles.input, error ? styles.inputError : null,
+          lefticon? styles.inputWithIcon : null,
+        ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -38,6 +45,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
         editable={editable}
         autoCapitalize={autoCapitalize}
       />
+      {righticon && <View style={styles.iconContainer}>{righticon}</View>}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
@@ -56,6 +64,14 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     paddingHorizontal: 15,
     fontSize: 16,
+  },
+  inputWithIcon: {
+    paddingLeft: 40, // Make room for the icon
+  },
+  iconContainer: {
+    position: 'absolute',
+    left: 15,
+    zIndex: 1,
   },
   inputError: {
     borderColor: '#ff3b30',
